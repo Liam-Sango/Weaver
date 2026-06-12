@@ -1,5 +1,5 @@
 import sys
-
+import struct
 
 OPCODE_TABLE = {
     # Stack
@@ -35,39 +35,66 @@ OPCODE_TABLE = {
 }
 
 
-def parse_bytecode_line(instruction):
-    parsed_bytecode_line = ""
+def parsed_bytecode_line(instruction):
+    parsed_bytecode_line = b""
 
-    #
-
+    #Opcode checking
     instruction_list = instruction.split(" ", 1)
-    instruction_mmemoric = instruction_list[1]
 
-
-
-    #Pre pass error checking
-    if instruction_mmemoric not in OPCODE_TABLE.values():
-        raise(ValueError)("Opcode in parse_btyecode_line is not present in instruction_mmemoric table")
-
-
-    #first pass (opcodes)
-    if (instruction_mmemoric == "PUSH32"):
-        print("ABC")
-
-    elif (instruction_mmemoric == "SYSCALL"):
-        print("ABC")
-
-    elif (instruction_mmemoric == "JMP"):
-        print("DEF")
-    elif (instruction_mmemoric == "JZ"):
-        print("DEF")
-    elif (instruction_mmemoric == "JNZ"):
-        print("DEF")
-    elif (instruction_mmemoric == "CALL"):
-        print("DEF")
-
+    if instruction_list[0] not in OPCODE_TABLE:
+        raise ValueError("parsed Opcode mmemoric in parse_btyecode_line is not present in instruction table")
+    
+    instruction_mnemonic = instruction_list[0] 
+    opcode_byte = OPCODE_TABLE[instruction_mnemonic]
+    
+    if (len(instruction_list) == 2):
+         instruction_operand = instruction_list[1] 
     else:
-        {parsed_bytecode_line == OPCODE_TABLE.get(instruction_mmemoric)}
+        instruction_operand = None
+
+
+    SINGLE_BYTE_OPS = {"DUP", "SWAP", "DROP", "ADD", "SUB", "AND", "OR", "XOR", "NOT", "LOAD32", "STORE32", "RET", "HALT"}
+    TWO_BYTE_OPS = {"JMP", "JZ", "JNZ", "CALL"}
+
+    if (instruction_operand is not None and instruction_mnemonic in SINGLE_BYTE_OPS): 
+        raise ValueError("Parsed invalid instruction operand pairing in parsed_bytecode_line,") 
+    
+    #Single byte operations
+    elif (instruction_mnemonic in SINGLE_BYTE_OPS):
+        parsed_bytecode_line = bytes([opcode_byte])
+
+    #Two byte operations
+    elif (instruction_mnemonic in TWO_BYTE_OPS):
+
+        if(instruction_operand is None):
+            raise ValueError("Parsed invalid instruction operand pairing in parsed_bytecode_line,") 
+        
+        int_value = int(instruction_operand)
+        packed_bytes = struct.pack(">h", int_value)
+
+        parsed_bytecode_line = bytes([opcode_byte]) + packed_bytes
+
+    #Push32
+    elif (instruction_mnemonic == "PUSH32"):
+
+        if(instruction_operand is None):
+            raise ValueError("Parsed invalid instruction operand pairing in parsed_bytecode_line,") 
+        
+        int_value = int(instruction_operand)
+        packed_bytes = struct.pack(">i", int_value)
+
+        parsed_bytecode_line = bytes([opcode_byte]) + packed_bytes
+
+    elif (instruction_mnemonic == "SYSCALL"):
+
+        if(instruction_operand is None):
+            raise ValueError("Parsed invalid instruction operand pairing in parsed_bytecode_line,") 
+        
+        int_value = int(instruction_operand)
+        packed_bytes = struct.pack(">B", int_value)
+
+        parsed_bytecode_line = bytes([opcode_byte]) + packed_bytes
+      
 
 
     #Second pass (Labels)
