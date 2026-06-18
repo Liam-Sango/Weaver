@@ -146,7 +146,6 @@ class VirtualMachine:
 
                 self.data_stack[-2:] = [Val_Sum]
 
-
             #NOT
             elif opcode == 0x15:
                 #performs an bitwise NOT operation of the top two elements of the data stack
@@ -164,14 +163,43 @@ class VirtualMachine:
                 self.data_stack[-1:] = [Val_Sum]
             
 
-             # Memory OPCODES
+            # Memory OPCODES
             
             #LOAD32
             elif opcode == 0x20:
-                print("TEMP")
+                 #loads 32 bit value from memory and pushes it to the top of the stack
+                 if len(self.data_stack) < 1:
+                    raise ValueError("'LOAD32' requires at least one value on the stack.")
+                 
+                 Address = self.data_stack.pop()
+
+                 if not isinstance(Address, int):
+                     raise TypeError("LOAD32 address must be an integer.")
+
+                 if not (0 <= Address <= len(self.memory) - 4): 
+                     raise ValueError("'LOAD32' address out of bounds.")
+                 
+                 bit32_value = int.from_bytes(self.memory[Address:Address+4], byteorder="big", signed=True)
+                 self.data_stack.append(bit32_value)
+
             #STORE32
             elif opcode == 0x21:
-                print("TEMP")
+                #Stores 32 bit value in memory from values at the top of the stack
+                 if len(self.data_stack) < 2:
+                    raise ValueError("'STORE32' requires at least two values on the stack.")
+                 
+                 Value = self.data_stack.pop()
+                 Address = self.data_stack.pop()
+
+                 if not isinstance(Address, int):
+                     raise TypeError("STORE32 address must be an integer.")
+
+                 if not (0 <= Address <= len(self.memory) - 4): 
+                     raise ValueError("'STORE32' address out of bounds.")
+                 
+                 bit32_value = Value.to_bytes(4, byteorder="big", signed=True)
+                 
+                 self.memory[Address:Address+4] = bit32_value
 
             #Control OPCODES
             
@@ -192,7 +220,7 @@ class VirtualMachine:
                 print("TEMP")
 
 
-            #System OPCODES
+            # System OPCODES
             
             #JMP
             elif opcode == 0x40:
