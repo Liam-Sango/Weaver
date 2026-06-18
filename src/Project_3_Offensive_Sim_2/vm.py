@@ -36,7 +36,6 @@ class VirtualMachine:
                 byte_arr_32 = bytearray()
     
                 for x in range(4):
-
                     if self.instruction_pointer >= len(self.bytecode):
                         raise ValueError ("operand bytes missing for PUSH32")
                     
@@ -59,12 +58,15 @@ class VirtualMachine:
                 
             #SWAP
             elif opcode == 0x03:
-                print("TEMP")
-            
+                # Reads and swaps top  two elements of the data stack
+                if len(self.data_stack) < 2:
+                    raise ValueError("Data stack values missing for SWAP")
+                
+                self.data_stack[-1], self.data_stack[-2] = self.data_stack[-2], self.data_stack[-1]
+
             #DROP
             elif opcode == 0x04:
                 print("TEMP")
-
 
             # Arithmetic OPCODES
             
