@@ -1,4 +1,74 @@
 import struct
+import logging
+
+# Configure syscall logging
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
+
+def log_function_call(func):
+    def wrapper(*args, **kwargs):
+        logger.info(f'Calling {func.__name__} with args: {args}, kwargs: {kwargs}')
+        result = func(*args, **kwargs)
+        logger.info(f'{func.__name__} returned: {result}')
+        return result
+    return wrapper
+
+
+#SYSCALL FUNCTIONS
+
+ # FILE HANDLING
+@log_function_call
+def file_read(vm):
+    length = vm.data_stack.pop()
+    address = vm.data_stack.pop()
+    return 0
+
+@log_function_call
+def file_write(vm):
+    length = vm.data_stack.pop()
+    address = vm.data_stack.pop()
+    return 0
+
+
+ # NETWORK HANDLING
+@log_function_call
+def tcp_connect(vm):
+    port = vm.data_stack.pop()
+    host_addr = vm.data_stack.pop()
+    return 0
+
+@log_function_call
+def dns_lookup(vm):
+    hostname_addr = vm.data_stack.pop()
+    return 0
+
+@log_function_call
+def sleep(vm):
+    milliseconds = vm.data_stack.pop()
+    return 0
+
+@log_function_call
+def http_get(vm):
+    dest_addr = vm.data_stack.pop()
+    url_addr = vm.data_stack.pop()
+    return 0
+
+
+#SYSCALL TABLES 
+
+sys_call_table = {
+    # FILE HANDLING
+
+    0: file_read,
+    1: file_write,
+
+    # NETWORK HANDLING
+
+    2: tcp_connect,
+    3: dns_lookup, 
+    4: sleep,
+    5: http_get,
+}
 
 class VirtualMachine:
        
@@ -156,7 +226,6 @@ class VirtualMachine:
                     raise ValueError("'NOT' requires at least one values on the data stack.")
                 
                 right = self.data_stack[-1]
-                left = self.data_stack[-2]
 
                 Val_Sum = (~right) & 0xFFFFFFFF
                 
@@ -263,15 +332,29 @@ class VirtualMachine:
 
             # System OPCODES
             
+            
             #SYSCALL
             elif opcode == 0x40:
-                print("TEMP")
+                if self.instruction_pointer >= len(self.bytecode):
+                        raise ValueError (" 'SYSCALL' Requires at least one additional index byte in the bytecode")
+                
+                index = self.bytecode[self.instruction_pointer]
+                self.instruction_pointer += 1
+
+                if index not in sys_call_table:
+                     raise ValueError (f"'SYSCALL' index {index} is not in the syscall table.")
+
+                handler = sys_call_table[index]
+                result = handler(self)
+
+                if result is not None:
+                    self.data_stack.append(result)
 
             #Halt OPCODE
 
             #HALT
             elif opcode == 0xFF:
-                print("TEMP")
+                self.is_halted = True
 
 
             else: 
