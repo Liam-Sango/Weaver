@@ -13,8 +13,8 @@
 (Manual implementation/Debugging, AI Automated Finished function testing.)
 
 # CRYPTO_WRAPPER.PY
-# #INCOMPLETE 
-(FILL ME)
+# #COMPLETE (20/06/26) 
+(Manual implementation/Debugging, AI Automated Finished function testing.)
 
 # STEGO.PY
 # #INCOMPLETE 
