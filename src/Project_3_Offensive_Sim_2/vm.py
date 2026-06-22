@@ -3,8 +3,6 @@ import logging
 import time
 import gc
 
-# Configure syscall logging
-logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 def log_function_call(func):
