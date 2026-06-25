@@ -38,11 +38,25 @@ def server_derive_allkeys(K_root):
 
     return server_keys
 
+#Saves K_root to keyfile.
 def server_save_server_keys(keyfile_path, k_root):
-    print("ABC")
+    server_keys = {"K_root": k_root.hex()}
 
+    with open(keyfile_path, "w") as f:
+        json.dump(server_keys, f)
+
+#Loads K_root from keyfile
 def server_load_server_keys(keyfile_path):
-    print("ABC")
+    #Opens keyfile
+    try: 
+        with open(keyfile_path, "r") as f:
+            data = json.load(f)
+            return bytes.fromhex(data["K_root"])
+    #If keyfile doesnt exist
+    except FileNotFoundError:
+        server_key = server_generate_k_root()
+        server_save_server_keys(keyfile_path, server_key)
+        return server_key
 
 
 #Agent side functions
