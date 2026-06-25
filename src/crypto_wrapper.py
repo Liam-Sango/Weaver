@@ -26,6 +26,10 @@ def encrypt_task(bytecode: bytes, K_ratchet: bytes) -> tuple[bytes, bytes]:
     return(payload, new_k_ratchet)
 
 def decrypt_task(payload: bytes, K_ratchet: bytes) -> tuple[bytes, bytes] | None:
+    #Reject payloads too short to contain salt + IV + tag
+    if len(payload) < 28 + 16:
+        return None
+
     #Gets random values
     salt = payload[0:16]
     iv = payload[16:28]
