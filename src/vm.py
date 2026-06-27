@@ -88,6 +88,20 @@ class VirtualMachine:
         self.instruction_pointer = 0
         self.is_halted = False
         self.time_limit = time_limit
+        self.buffers = {}     
+        self.next_handle = 0   
+
+    #FILL OUT LATER
+    def store_buffer(self, data):
+        print("ABC")
+
+    #FILL OUT LATER
+    def get_buffer(self, handle):
+        print("ABC")
+
+    #FILL OUT LATER
+    def read_string(self, address):
+        print("ABC")
 
     #Securely zeroes and clears all ephemeral VM state
     def wipe(self):
