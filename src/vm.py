@@ -19,9 +19,22 @@ def log_function_call(func):
 #File handling
 @log_function_call
 def file_read(vm):
-    length = vm.data_stack.pop()
     address = vm.data_stack.pop()
-    return 0
+
+    try:
+        path = vm.read_string(address)
+
+        with open(path, "rb") as f:
+            data = f.read()
+
+        handle = vm.store_buffer(data)
+        return handle
+
+    except FileNotFoundError:
+        return -1
+
+    except OSError:
+        return -1
 
 @log_function_call
 def file_write(vm):
