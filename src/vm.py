@@ -2,6 +2,7 @@ import struct
 import logging
 import time
 import gc
+import requests
 
 logger = logging.getLogger(__name__)
 
@@ -16,7 +17,7 @@ def log_function_call(func):
 
 #Syscall functions
 
-#File handling
+#Reads a file and pushes it into the VM buffer
 @log_function_call
 def file_read(vm):
     address = vm.data_stack.pop()
@@ -35,6 +36,7 @@ def file_read(vm):
 
     except OSError:
         return -1
+
 
 @log_function_call
 def file_write(vm):
@@ -65,11 +67,23 @@ def sleep(vm):
     time.sleep(milliseconds / 1000)
     return 0
 
+#Sends a HTTP requests and returns a handle containing the response
 @log_function_call
 def http_get(vm):
-    dest_addr = vm.data_stack.pop()
     url_addr = vm.data_stack.pop()
-    return 0
+
+    try:
+        url = vm.read_string(url_addr)
+
+        with requests.get(url, timeout=30) as request:
+            response = request.content
+
+        handle = vm.store_buffer(response)
+        return handle
+    
+    except requests.exceptions.RequestException:
+        return -1
+    
 
 @log_function_call
 def arweave_upload(vm):
