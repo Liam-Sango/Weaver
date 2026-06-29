@@ -44,7 +44,6 @@ def file_write(vm):
     address = vm.data_stack.pop()
     return 0
 
-#Network handling
 @log_function_call
 def tcp_connect(vm):
     port = vm.data_stack.pop()
@@ -83,11 +82,18 @@ def http_get(vm):
     
     except requests.exceptions.RequestException:
         return -1
-    
 
 @log_function_call
+#Uploads an arweave transaction to the blockchain
 def arweave_upload(vm):
-    return 0
+    handle = vm.data_stack.pop()
+    data = vm.get_buffer(handle)
+
+    if vm.exfil_handler is None:
+        return -1
+    
+    exfil_return = vm.exfil_handler(vm, data)
+    return exfil_return
 
 
 #Syscall table
@@ -101,11 +107,14 @@ sys_call_table = {
     3: dns_lookup,
     4: sleep,
     5: http_get,
+
+    #Exfiltration
+    6: arweave_upload,
 }
 
 class VirtualMachine:
 
-    def __init__(self, bytecode, memory_size=4096, time_limit=5):
+    def __init__(self, bytecode, memory_size=4096, time_limit=5, exfil_handler=None):
 
         if not isinstance(memory_size, int):
             raise ValueError("Memory size must be an integer")
@@ -128,6 +137,7 @@ class VirtualMachine:
         self.time_limit = time_limit
         self.buffers = {}     
         self.next_handle = 0   
+        self.exfil_handler = exfil_handler
 
     #creates and stores data in the current handle buffer
     def store_buffer(self, data):
@@ -178,6 +188,8 @@ class VirtualMachine:
         self.return_stack.clear()
         self.memory.clear()
         self.bytecode.clear()
+        self.buffers.clear()
+        self.next_handle = 0
 
         #Run the garbage collector
         gc.collect()
@@ -457,9 +469,9 @@ class VirtualMachine:
                 raise ValueError(f"Unknown opcode: {opcode}")
 
 #Executes bytecode and returns a snapshot of the VM state before wiping
-def execute_bytecode(bytecode: bytearray | bytes, memory_size : int = 4096):
+def execute_bytecode(bytecode: bytearray | bytes, memory_size : int = 4096, exfil_handler=None):
 
-    vm = VirtualMachine(bytecode, memory_size)
+    vm = VirtualMachine(bytecode, memory_size, exfil_handler=exfil_handler)
     try:
         vm.run()
         result = {
