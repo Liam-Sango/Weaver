@@ -87,16 +87,27 @@ def embed(cover_image_path: str, payload: bytes, k_extract: bytes) -> PIL.Image:
     return PIL.Image.fromarray(pixels)
 
 #Extracts a payload from the LSBs of a stego image at keyed positions
-def extract(stego_image_path: str, k_extract: bytes, payload_length: int) -> bytes:
+def extract(stego_image_path: str, k_extract: bytes) -> bytes:
     image = PIL.Image.open(stego_image_path).convert("RGB")
     pixels = numpy.array(image, dtype=numpy.uint8)
 
-    num_bits = payload_length * 8
-    positions = generate_positions(pixels.shape, k_extract, num_bits)
+    #Generates positions for the 4-byte length prefix plus the payload
+    prefix_positions = generate_positions(pixels.shape, k_extract, 32)
+    prefix_bits = []
+    for (x, y, channel) in prefix_positions:
+        prefix_bits.append(int(pixels[y, x, channel] & 1))
 
-    #Reads the LSB of each selected pixel channel to collect bits
-    bits = []
-    for (x, y, channel) in positions:
-        bits.append(int(pixels[y, x, channel] & 1))
+    prefix_bytes = bits_to_bytes(prefix_bits)
+    payload_length = int.from_bytes(prefix_bytes, "big")
 
-    return bits_to_bytes(bits)
+    #Generates positions for the full payload (prefix + payload) and skips the first 32
+    total_bits = 32 + payload_length * 8
+    all_positions = generate_positions(pixels.shape, k_extract, total_bits)
+
+    #Reads the LSB of each selected pixel channel to collect payload bits
+    payload_bits = []
+    for (x, y, channel) in all_positions[32:]:
+        payload_bits.append(int(pixels[y, x, channel] & 1))
+
+    return bits_to_bytes(payload_bits)
+
