@@ -2,11 +2,10 @@ import os
 import hashlib
 import hmac
 import json
-import arweave
 
 #Shared functions
 
-#Advanced ratchet mechanism
+#Advances the ratchet mechanism
 def advance_ratchet(k_ratchet):
     return hmac.new(k_ratchet, b"RATCHET", hashlib.sha256).digest()
 
@@ -38,7 +37,8 @@ def server_derive_allkeys(K_root):
 
     return server_keys
 
-#Saves K_root to keyfile.
+#Saves server keys to keyfile
+
 def server_save_server_keys(keyfile_path, K_root, K_ratchet, K_exfil_ratchet, agent_wallet=None, last_seen_txid=None):
     #Load existing keyfile to preserve fields not passed in
     existing = {}
@@ -68,17 +68,50 @@ def server_save_server_keys(keyfile_path, K_root, K_ratchet, K_exfil_ratchet, ag
     with open(keyfile_path, "w") as f:
         json.dump(server_keys, f)
 
-#Loads K_root from keyfile
+#Loads server keys from keyfile
+
 def server_load_server_keys(keyfile_path):
+    #generate K_root and derive initial ratchets if keyfile is missing
     try: 
         with open(keyfile_path, "r") as f:
             data = json.load(f)
-    #If keyfile doesnt exist
     except FileNotFoundError:
-        server_key = server_generate_k_root()
-        server_save_server_keys(keyfile_path, server_key)
-        return server_key
+        K_root = server_generate_k_root()
+        derived = server_derive_allkeys(K_root)
+        server_save_server_keys(keyfile_path, K_root, derived["K_ratchet"], derived["K_exfil_ratchet"])
+        return {
+            "K_root": K_root,
+            "K_ratchet": derived["K_ratchet"],
+            "K_exfil_ratchet": derived["K_exfil_ratchet"],
+            "agent_wallet": "",
+            "last_seen_txid": "",
+        }
 
+    #Load K_root (always present if a keyfile is found)
+    K_root = bytes.fromhex(data["K_root"])
+
+    #If ratchet values arent present, derive them from K_root
+    K_ratchet_hex = data.get("K_ratchet", "")
+    K_exfil_ratchet_hex = data.get("K_exfil_ratchet", "")
+
+    if K_ratchet_hex and K_exfil_ratchet_hex:
+        K_ratchet = bytes.fromhex(K_ratchet_hex)
+        K_exfil_ratchet = bytes.fromhex(K_exfil_ratchet_hex)
+    else:
+        derived = server_derive_allkeys(K_root)
+        K_ratchet = derived["K_ratchet"]
+        K_exfil_ratchet = derived["K_exfil_ratchet"]
+
+    agent_wallet = data.get("agent_wallet", "")
+    last_seen_txid = data.get("last_seen_txid", "")
+
+    return {
+        "K_root": K_root,
+        "K_ratchet": K_ratchet,
+        "K_exfil_ratchet": K_exfil_ratchet,
+        "agent_wallet": agent_wallet,
+        "last_seen_txid": last_seen_txid,
+    }
 
 #Agent side functions
 
@@ -117,6 +150,7 @@ def agent_save_agent_keys(keyfile_path, K_ratchet, K_exfil_ratchet, K_extract,
         json.dump(agent_keys, f)
 
 #Loads agent keys from keyfiles
+
 def agent_load_agent_keys(keyfile_path):
     #Tries to open keyfile
     try: 
@@ -148,7 +182,8 @@ def agent_load_agent_keys(keyfile_path):
 #Wallet functions
 
 def load_wallet(keyfile_path):
-     return arweave.Wallet(keyfile_path)
+    import arweave
+    return arweave.Wallet(keyfile_path)
 
 
 
