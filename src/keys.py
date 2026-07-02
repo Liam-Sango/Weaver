@@ -39,19 +39,40 @@ def server_derive_allkeys(K_root):
     return server_keys
 
 #Saves K_root to keyfile.
-def server_save_server_keys(keyfile_path, k_root):
-    server_keys = {"K_root": k_root.hex()}
+def server_save_server_keys(keyfile_path, K_root, K_ratchet, K_exfil_ratchet, agent_wallet=None, last_seen_txid=None):
+    #Load existing keyfile to preserve fields not passed in
+    existing = {}
+    if os.path.exists(keyfile_path):
+        try:
+            with open(keyfile_path, "r") as f:
+                existing = json.load(f)
+        except (json.JSONDecodeError, OSError):
+            existing = {}
 
+    #Saves server keys to temp dict
+    server_keys = {
+        "K_root": K_root.hex(),
+        "K_ratchet": K_ratchet.hex(),
+        "K_exfil_ratchet": K_exfil_ratchet.hex(),
+        "agent_wallet": existing.get("agent_wallet", ""),
+        "last_seen_txid": existing.get("last_seen_txid", "")
+    }
+
+    #Override with explicitly-provided runtime/provisioning values
+    if agent_wallet is not None:
+        server_keys["agent_wallet"] = agent_wallet
+    if last_seen_txid is not None:
+        server_keys["last_seen_txid"] = last_seen_txid
+
+    #saves server keys to keyfile
     with open(keyfile_path, "w") as f:
         json.dump(server_keys, f)
 
 #Loads K_root from keyfile
 def server_load_server_keys(keyfile_path):
-    #Opens keyfile
     try: 
         with open(keyfile_path, "r") as f:
             data = json.load(f)
-            return bytes.fromhex(data["K_root"])
     #If keyfile doesnt exist
     except FileNotFoundError:
         server_key = server_generate_k_root()
